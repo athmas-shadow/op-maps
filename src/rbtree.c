@@ -19,7 +19,7 @@ static struct rb_node_t *create_node(struct rb_node_t *parent, void *val)
   node->left = NULL;
   node->right = NULL;
   node->colour = RED;
-  node->value = value;
+  node->value = val;
 
   return node;
 }
@@ -27,8 +27,7 @@ static struct rb_node_t *create_node(struct rb_node_t *parent, void *val)
 
 static void insert(struct rb_tree *tree, void *val)
 {
-  struct rb_node_t **rt = &(tree->root);  
-  struct rb_node_t **cr = &rt;
+  struct rb_node_t **cr = &(tree->root);  
   struct rb_node_t **pt, *n;
   int vl;
   while (*cr != NULL) 
@@ -53,27 +52,15 @@ static void delete(struct rb_tree *tree, void *val)
 
 }
 
-static struct int has_next(struct rb_tree_iterator *iter)
-{
-  struct rb_node_t *cur = iter->current;
-  return (cur != NULL && (cur->parent != NULL || cur->right));
-}
-
-static struct rb_node_t *get_next(struct rb_tree_iterator *iter)
-{
-  if (!has_next(iter))
-    return NULL;
-
-}
 void create_inorder_iterator(struct rb_tree *tree)
 {
   tree->current = get_lm_child(tree->root);
 }
 
-bool has_next(struct rb_tree *tree)
+_bool has_next(struct rb_tree *tree)
 {
   struct rb_node_t **cr = &(tree->current);
-  return (*cr != NULL) && ((cr->parent != NULL) || (cr->right != NULL));
+  return (*cr != NULL) && (((*cr)->parent != NULL) || ((*cr)->right != NULL));
 }
 
 /*
@@ -98,8 +85,6 @@ struct rb_tree *rb_create_tree(
   tree->root = NULL;
   tree->cmp = cmp;
   tree->find = find;
-  tree->print = print;
-  tree->iterator = create_iterator(tree);
   
   return tree;
 }
@@ -114,15 +99,15 @@ void rb_print(struct rb_tree *tree, void (*rb_print_node)(struct rb_node_t *node
 
 void rb_print_node_int(struct rb_node_t *node)
 {
-  printf("%d. ",(int)(*node->val));
+  printf("%d. ",*((int*)(node->value)));
 }
 
 /*------------------------------------ helper functions. -------------------------*/
 /* retreive leftmost comparision. */
 static struct rb_node_t *get_lm_child(struct rb_node_t *node)
 {
-  struct rb_node **cr = &node;
-  struct rb_node **pt;
+  struct rb_node_t **cr = &node;
+  struct rb_node_t **pt;
   while (*cr != NULL) {
     *pt = *cr;
     cr = &((*cr)->left);
@@ -134,7 +119,7 @@ static struct rb_node_t *get_lm_child(struct rb_node_t *node)
 /* integer comparision */
 static int cmp(void *v1, void *v2)
 {
-  int i1 = (int)(*v1), i2 = (int)(*v2);
+  int i1 = *((int*)(v1)), i2 = *((int *)(v2));
   if (i1 < i2)
     return -1;
   return i1 > i2;
