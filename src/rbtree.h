@@ -18,14 +18,20 @@ struct rb_tree {
   struct rb_node_t *current;
   
   int (*cmp)(void *n1, void *n2);
+  void (*valcpy)(void **v1, void *v2);
   int (*find)(void *val);
+
   
 };
 
-struct rb_tree *rb_create_tree();
+extern struct rb_tree *rb_create_tree(
+    int (*cmp)(void *n1, void *n2),
+    void (*valcpy)(void **v1, void *v2),
+    int (*find)(void *val)
+    );
 void rb_init_iterator(struct rb_tree *tree);
 _bool rb_has_next(struct rb_tree *tree);
 void rb_next(struct rb_tree *tree);
-
-
+extern void rb_insert(struct rb_tree *tree, void *val);
+extern void rb_print_tree(struct rb_tree *tree, void (*rb_print_node)(void *val));
 #endif
