@@ -2,14 +2,31 @@
 #include <stdio.h>
 #include "rbtree.h"
 
+#define COL_MET(node, relative) ((node->colour == RED) && (relative->colour == RED))
 
 //--------------------------- helper function definitions. ---------------------------------
 static struct rb_node_t *get_lm_child(struct rb_node_t *node);
+static struct rb_node_t *get_sibling(struct rb_node_t *node);
 static _bool is_left_child(struct rb_node_t *pt, struct rb_node_t *chd);
 static int icmp(void *v1, void *v2);
 static void print(struct rb_tree *tree);
+static void rb_insert_at_subtree(struct rb_tree *tree, struct rb_node_t **root, void *val);
 
 //------------------------------------------------------------------------------------------
+
+static void rebalance_tree(struct rb_tree *tree, struct rb_node_t *node, struct rb_node_t *parent);
+
+//--------------------------- tree rotation functions. -------------------------------------
+static void rotate_left(struct rb_tree *tree, struct rb_node_t *node, struct rb_node_t *parent);
+static void rotate_right(struct rb_tree *tree, struct rb_node_t *node, struct rb_node_t *parent);
+//------------------------------------------------------------------------------------------
+
+//--------------------------- tree mutation cases. -----------------------------------------
+static _bool c1_rebalance(struct rb_tree *tree, struct rb_node_t *node);
+static _bool c2_rebalance(struct rb_tree *tree, struct rb_node_t *node);
+static _bool c3_rebalance(struct rb_tree *tree, struct rb_node_t *node);
+//------------------------------------------------------------------------------------------
+
 /**
  * allocates memory for node.
  * */
@@ -19,22 +36,52 @@ static struct rb_node_t *rb_create_node(struct rb_tree *tree, struct rb_node_t *
   node->parent = parent;
   node->left = NULL;
   node->right = NULL;
-  node->colour = RED;
-  //node->value = (void *)malloc(sizeof(int));
-  //*((int *)node->value) = *((int *)val);
+  node->colour = (tree->root == NULL) ? BLACK : RED;
   tree->valcpy(&(node->value), val);
   return node;
 }
 
+static void rebalance_tree(struct rb_tree *tree, struct rb_node_t *node, struct rb_node_t *parent)
+{
+  struct rb_node_t *pt = node->parent, *sb = get_sibling(node);
+  if (COL_MET(node, pt)) {
+
+  }
+}
+
+static void rotate_left(struct rb_tree *tree, struct rb_node_t *node, struct rb_node_t *parent)
+{
+  struct rb_node_t *gp = parent->parent;
+  node->parent = gp;
+  node->left = parent;
+  parent->right = NULL;
+  parent->parent = node;
+}
+
+static void rotate_right(struct rb_tree *tree, struct rb_node_t *node, struct rb_node_t *parent)
+{
+  struct rb_node_t *gp = parent->parent;
+  parent->parent = gp->parent;
+  gp->parent = parent;
+  gp->left = NULL;
+  //rb_insert_at_subtree(parent->);
+}
+
+
 void rb_insert(struct rb_tree *tree, void *val)
 {
-  struct rb_node_t **cr = &(tree->root);  
-  struct rb_node_t *pt = NULL, *n;
+  rb_insert_at_subtree(tree, &(tree->root), val);  
+}
+
+void rb_insert_at_subtree(struct rb_tree *tree, struct rb_node_t **root, void *val)
+{
+  struct rb_node_t **cr = root;
+  struct rb_node_t *pt = NULL;
   int vl;
   printf("inserting %d\n",*((int *)val));
   while (*cr != NULL) 
   {
-    vl = icmp(val, (*cr)->value);
+    vl = tree->cmp(val, (*cr)->value);
     printf("at %d --> ",*((int *)(*cr)->value));
     pt = *cr; 
     if (vl < 0)
@@ -46,8 +93,17 @@ void rb_insert(struct rb_tree *tree, void *val)
   }
   printf("done...\n");
   *cr = rb_create_node(tree, pt, val);
+  return;
+  if (pt == NULL)
+    return;
+  rebalance_tree(tree, *cr, pt);
 }
 
+void rb_insert_node_at_subtree(struct rb_node_t *root, struct rb_node_t *node)
+{
+  struct rb_node_t **cr = &root;
+  struct rb_node_t *pt = NULL;
+}
 
 static void delete(struct rb_tree *tree, void *val)
 {
@@ -135,7 +191,18 @@ static _bool is_left_child(struct rb_node_t * pt, struct rb_node_t *chd)
 {
   return pt->left == chd;
 }
-/* retreive leftmost comparision. */
+
+
+static struct rb_node_t *get_sibling(struct rb_node_t *node)
+{
+  struct rb_node_t *pt = node->parent;
+  if (is_left_child(pt, node))
+    return pt->left;
+  else
+    return pt->right;
+}
+
+/* retreive leftmost child. */
 static struct rb_node_t *get_lm_child(struct rb_node_t *node)
 {
   struct rb_node_t **cr = &node;
