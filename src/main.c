@@ -51,9 +51,11 @@ void integer_print(void *v1)
 int main(void) {
   init_random();
   struct rb_tree *tree = rb_create_tree(integer_cmp, integer_cpy, NULL);
-  for (int i =0; i < 50; i++) {
+  int nums[10] = {90, 844, 1000, 884, 997, 310, 341, 183, 333, 694};
+  int data[7] = {0, 1, 2, 3, 4, 5, 6};
+  for (int i =0; i < 7; i++) {
     int ri = random_int(0, 1000); 
-    rb_insert(tree, &ri);
+    rb_insert(tree, &data[i]);
   }
   if (tree->root == NULL)
     printf("insertion: failure!");

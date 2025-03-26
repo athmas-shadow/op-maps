@@ -7,21 +7,45 @@
 #define ROTATE_LEFT1(N, P, GP) do {\
   N->parent = GP;\
   P->parent = N;\
+  P->right = N->left;\
+  if (N->left != NULL) {\
+    (N->left)->parent = P;\
+  }\
   N->left = P;\
   GP->left = N;\
-  P->right = NULL;\
 } while (0)
 
 #define ROTATE_LEFT2(N, P, GP) do {\
   N->parent = GP;\
   P->parent = N;\
+  P->left = N->right;\
+  if (N->right != NULL) {\
+    (N->right)->parent = P;\
+  }\
   N->right = P;\
   GP->right = N;\
-  P->left = NULL;\
 } while (0)
 
+// TODO: rotate right both cases.
+#define ROTATE_RIGHT1(N, P, GP) do {\
+  P->colour = BLACK;\
+  GP->colour = RED;\
+  GP->left = P->right;\
+  if (P->right != NULL) {\
+    (P->right)->parent = GP;\
+  }\
+  P->right = GP;\
+} while (0)
 
-
+#define ROTATE_RIGHT2(N, P, GP) do {\
+  P->colour = BLACK;\
+  GP->colour = RED;\
+  GP->right = P->left;\
+  if (P->left != NULL) {\
+    (P->left)->parent = GP;\
+  }\
+  P->left = GP;\
+} while (0)
 
 
 //--------------------------- helper function definitions. ---------------------------------
@@ -56,134 +80,97 @@ static struct rb_node_t *rb_create_node(struct rb_tree *tree, struct rb_node_t *
   node->parent = parent;
   node->left = NULL;
   node->right = NULL;
-  node->colour = (tree->root == NULL) ? BLACK : RED;
+  node->colour = (tree->root == NULL) ? BLACK:RED;
   tree->valcpy(&(node->value), val);
   return node;
 }
 
 static void rebalance_tree(struct rb_tree *tree, struct rb_node_t *node, struct rb_node_t *parent)
 {
-  struct rb_node_t *GP, *U, *N = node, *P;
+  struct rb_node_t *GP, *U, **N = &node, *P;
   
   //LOOP where N is always a red node.
-  while ((N != NULL) && ((P = N->parent) != NULL)) {
+  while (((*N) != NULL)) {
     printf("in loop...\n");
-    if (N == tree->root && N->colour == RED) return;
+    if ((*N) == tree->root && (*N)->colour == RED) {
+      printf("red root.\n");
+      (*N)->colour = BLACK;
+      return;
+    }
+
+    if ((P = (*N)->parent) == NULL) {
+      return;
+    }
+    
     if (P->colour == BLACK) {
       return;
     }
     else if (P == tree->root) {
+      printf("parent root.\n");
       P->colour = BLACK;
       return;
     }
     GP = P->parent;
-    if (GP == NULL) return;
+    if (GP == NULL) {
+      printf("no gran.\n");
+      return;
+    }
 
     U = get_sibling(P);
-    if (U == NULL) return;
-
-    if (RED_NODE(P, U)) {
+    if (U != NULL && RED_NODE(P, U)) {
+      printf("no unc.\n");
       P->colour = BLACK;
       U->colour = BLACK;
       GP->colour = RED;
-      N = GP;
+      N = &GP;
       printf("case 1.\n");
 
     }
-    else if (U->colour == BLACK) {
-      int v1, v2;
-      v1 = tree->cmp(N, P);
-      v2 = tree->cmp(N, GP);
+    else {
+      int v1, v2, v3;
+      v1 = tree->cmp(*N, P);
+      v2 = tree->cmp(*N, GP);
+      v3 = tree->cmp(P, GP);
 
+      printf("case 2\n");
       if (v1 > 0 && v2 < 0) {
         printf("left rotation 1.\n");
-        ROTATE_LEFT1(N, P, GP);
-      }
-      else if (v1 < 0 && v2 > 0) {
+        ROTATE_LEFT1((*N), P, GP);
+        continue;
+      } else if (v1 < 0 && v2 > 0) {
         printf("left rotation 2.\n");
-        ROTATE_LEFT2(N, P, GP);
+        ROTATE_LEFT2((*N), P, GP);
+        continue;
+      } else if (v1 < 0 && v3 < 0) {
+        printf("right rotation 1:\n");
+        ROTATE_RIGHT1(*N, P, GP);
+        goto rr_gp;
+
+      } else if ( v1 > 0 && v3 > 0) {
+        printf("right rotation 2:\n");
+        ROTATE_RIGHT2(*N, P, GP);
+        goto rr_gp;
+      }
+rr_gp:
+      if (GP->parent != NULL) {
+        P->parent = GP->parent;
+        if ((GP->parent)->left == GP)
+          (GP->parent)->left = P;
+        else 
+          (GP->parent)->right = P;
+        
+        GP->parent = P;
       }
       else {
-
+        printf("right rotation >> new root\n\n");
+        GP->parent = P;
+        tree->root = P;
+        P->parent = NULL;
       }
+      break;
     }
-    
   }  
-}
-
-static _bool rotate_left(struct rb_tree *tree, struct rb_node_t *node, struct rb_node_t *parent)
-{
-  struct rb_node_t *p = parent, *gp;
-  int v1, v2;
-  _bool x = 0;
-
-  if (p == NULL) return 0;
-  gp = p->parent;
-  if (gp == NULL) return 0;
-
-  /*valid conditions to warrant a left rotation 
-   * 1.) parent < node < granparent
-   * 2.) gran parent < node < parent
-   * */
-  v1 = tree->cmp(node, p);
-  v2 = tree->cmp(node, gp); 
-
-  if (!RED_NODE(p, node))
-    return 0;
-
-  node->parent = gp;
-  p->parent    = node;
-  if (v1 > 0 && v2 < 0) {
-    node->left = p;
-    p->right = NULL;
-    gp->left = node;
-    x = 1;
-
-  } else if (v1 < 0 && v2 > 0) {
-    node->right = p;
-    p->left = NULL;
-    gp->right = node;
-    x = 1;
-  }
-
-  return 1;
-}
-
-static _bool rotate_right(struct rb_tree *tree, struct rb_node_t *node, struct rb_node_t *parent)
-{
-  struct rb_node_t *p = parent, *gp;
-  int v1, v2;
-  _bool x;
-
-  if (p == NULL) return 0;
-  gp = p->parent;
-  if (gp == NULL) return 0;
-  
-  v1 = tree->cmp(p, gp);
-  v2 = tree->cmp(p, node);
-
-  if (!RED_NODE(p, node))
-    return 0;
-  /**
-   * valid conditions to warrant a right rotation.
-   * 1.) node(red) < parent(red) < gran parent(black) 
-   * 2.) granparent(black) > parent(red) > node(red)
-   * */ 
-  gp->parent = p;
-  gp->colour = RED;
-  if (v1 < 0 && v2 > 0) {
-    rb_insert_at_subtree(tree, &p, gp, 1); 
-    x = 1;
-  }
-  else if (v1 > 0 && v2 < 0) {
-    rb_insert_at_subtree(tree, &p, gp, 1);
-    x = 1;
-  }
-  p->colour = BLACK;
-  if (gp->parent == NULL)
-    return x;
-  rb_insert_at_subtree(tree, &(gp->parent), p, 1);
-  return x;
+  printf("tree-rebalanced.\n");
 }
 
 
@@ -204,7 +191,7 @@ void rb_insert_at_subtree(struct rb_tree *tree, struct rb_node_t **root, void *v
   while (*cr != NULL) 
   {
     vl = tree->cmp(v, (*cr)->value);
-    printf("at %d --> ",*((int *)(*cr)->value));
+    printf(" (%d:%d) --> ", (*cr)->colour ,*((int *)(*cr)->value));
     pt = *cr; 
     if (vl < 0)
       cr = &((*cr)->left);
@@ -305,13 +292,13 @@ static struct rb_node_t *get_sibling(struct rb_node_t *node)
 {
   struct rb_node_t *pt = node->parent;
 
-  if (pt != NULL)
+  if (pt == NULL)
     return NULL;
 
-  if (is_left_child(pt, node))
-    return pt->left;
-  else
+  if (pt->left == node)
     return pt->right;
+  else
+    return pt->left;
 }
 
 /* retreive leftmost child. */
