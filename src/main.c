@@ -51,7 +51,7 @@ void integer_print(void *v1)
 int main(void) {
   init_random();
   struct rb_tree *tree = rb_create_tree(integer_cmp, integer_cpy, NULL);
-  for (int i =0; i < 10; i++) {
+  for (int i =0; i < 50; i++) {
     int ri = random_int(0, 1000); 
     rb_insert(tree, &ri);
   }

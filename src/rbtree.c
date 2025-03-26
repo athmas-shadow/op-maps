@@ -1,8 +1,28 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include "rbtree.h"
 
 #define RED_NODE(node, relative) ((node->colour == RED) && (relative->colour == RED))
+#define ROTATE_LEFT1(N, P, GP) do {\
+  N->parent = GP;\
+  P->parent = N;\
+  N->left = P;\
+  GP->left = N;\
+  P->right = NULL;\
+} while (0)
+
+#define ROTATE_LEFT2(N, P, GP) do {\
+  N->parent = GP;\
+  P->parent = N;\
+  N->right = P;\
+  GP->right = N;\
+  P->left = NULL;\
+} while (0)
+
+
+
+
 
 //--------------------------- helper function definitions. ---------------------------------
 static struct rb_node_t *get_lm_child(struct rb_node_t *node);
@@ -17,8 +37,8 @@ static void rb_insert_at_subtree(struct rb_tree *tree, struct rb_node_t **root, 
 static void rebalance_tree(struct rb_tree *tree, struct rb_node_t *node, struct rb_node_t *parent);
 
 //--------------------------- tree rotation functions. -------------------------------------
-static void rotate_left(struct rb_tree *tree, struct rb_node_t *node, struct rb_node_t *parent);
-static void rotate_right(struct rb_tree *tree, struct rb_node_t *node, struct rb_node_t *parent);
+static _bool rotate_left(struct rb_tree *tree, struct rb_node_t *node, struct rb_node_t *parent);
+static _bool rotate_right(struct rb_tree *tree, struct rb_node_t *node, struct rb_node_t *parent);
 //------------------------------------------------------------------------------------------
 
 //--------------------------- tree mutation cases. -----------------------------------------
@@ -41,33 +61,65 @@ static struct rb_node_t *rb_create_node(struct rb_tree *tree, struct rb_node_t *
   return node;
 }
 
-static void rebalance_case1(struct rb_tree *tree, struct rb_node_t *node)
+static void rebalance_tree(struct rb_tree *tree, struct rb_node_t *node, struct rb_node_t *parent)
 {
-  struct rb_node_t *p = node->parent, *u;
-  if (p == NULL) return;
-  u = get_sibling(p);
-  if (u == NULL) return;
-  if (!(RED_NODE(p, u) && RED_NODE(p, node)))
-    return;
+  struct rb_node_t *GP, *U, *N = node, *P;
   
-  p->colour = BLACK;
-  u->colour = BLACK;
-  (p->parent)->colour = RED;
-  return rebalance_case1(tree, p->parent);
+  //LOOP where N is always a red node.
+  while ((N != NULL) && ((P = N->parent) != NULL)) {
+    printf("in loop...\n");
+    if (N == tree->root && N->colour == RED) return;
+    if (P->colour == BLACK) {
+      return;
+    }
+    else if (P == tree->root) {
+      P->colour = BLACK;
+      return;
+    }
+    GP = P->parent;
+    if (GP == NULL) return;
+
+    U = get_sibling(P);
+    if (U == NULL) return;
+
+    if (RED_NODE(P, U)) {
+      P->colour = BLACK;
+      U->colour = BLACK;
+      GP->colour = RED;
+      N = GP;
+      printf("case 1.\n");
+
+    }
+    else if (U->colour == BLACK) {
+      int v1, v2;
+      v1 = tree->cmp(N, P);
+      v2 = tree->cmp(N, GP);
+
+      if (v1 > 0 && v2 < 0) {
+        printf("left rotation 1.\n");
+        ROTATE_LEFT1(N, P, GP);
+      }
+      else if (v1 < 0 && v2 > 0) {
+        printf("left rotation 2.\n");
+        ROTATE_LEFT2(N, P, GP);
+      }
+      else {
+
+      }
+    }
+    
+  }  
 }
 
-static void rebalance_case2(struct rb_tree *tree, struct rb_node_t *node)
-{
- }
-
-static void rotate_left(struct rb_tree *tree, struct rb_node_t *node, struct rb_node_t *parent)
+static _bool rotate_left(struct rb_tree *tree, struct rb_node_t *node, struct rb_node_t *parent)
 {
   struct rb_node_t *p = parent, *gp;
   int v1, v2;
+  _bool x = 0;
 
-  if (p == NULL) return;
+  if (p == NULL) return 0;
   gp = p->parent;
-  if (gp == NULL) return;
+  if (gp == NULL) return 0;
 
   /*valid conditions to warrant a left rotation 
    * 1.) parent < node < granparent
@@ -77,7 +129,7 @@ static void rotate_left(struct rb_tree *tree, struct rb_node_t *node, struct rb_
   v2 = tree->cmp(node, gp); 
 
   if (!RED_NODE(p, node))
-    return;
+    return 0;
 
   node->parent = gp;
   p->parent    = node;
@@ -85,23 +137,53 @@ static void rotate_left(struct rb_tree *tree, struct rb_node_t *node, struct rb_
     node->left = p;
     p->right = NULL;
     gp->left = node;
+    x = 1;
 
   } else if (v1 < 0 && v2 > 0) {
     node->right = p;
     p->left = NULL;
     gp->right = node;
+    x = 1;
   }
 
-
+  return 1;
 }
 
-static void rotate_right(struct rb_tree *tree, struct rb_node_t *node, struct rb_node_t *parent)
+static _bool rotate_right(struct rb_tree *tree, struct rb_node_t *node, struct rb_node_t *parent)
 {
-  struct rb_node_t *gp = parent->parent;
-  parent->parent = gp->parent;
-  gp->parent = parent;
-  gp->left = NULL;
-  rb_insert_at_subtree(tree, &parent, (void *)gp, 1);
+  struct rb_node_t *p = parent, *gp;
+  int v1, v2;
+  _bool x;
+
+  if (p == NULL) return 0;
+  gp = p->parent;
+  if (gp == NULL) return 0;
+  
+  v1 = tree->cmp(p, gp);
+  v2 = tree->cmp(p, node);
+
+  if (!RED_NODE(p, node))
+    return 0;
+  /**
+   * valid conditions to warrant a right rotation.
+   * 1.) node(red) < parent(red) < gran parent(black) 
+   * 2.) granparent(black) > parent(red) > node(red)
+   * */ 
+  gp->parent = p;
+  gp->colour = RED;
+  if (v1 < 0 && v2 > 0) {
+    rb_insert_at_subtree(tree, &p, gp, 1); 
+    x = 1;
+  }
+  else if (v1 > 0 && v2 < 0) {
+    rb_insert_at_subtree(tree, &p, gp, 1);
+    x = 1;
+  }
+  p->colour = BLACK;
+  if (gp->parent == NULL)
+    return x;
+  rb_insert_at_subtree(tree, &(gp->parent), p, 1);
+  return x;
 }
 
 
@@ -133,9 +215,6 @@ void rb_insert_at_subtree(struct rb_tree *tree, struct rb_node_t **root, void *v
   }
   printf("done...\n");
   *cr = rb_create_node(tree, pt, val);
-  return;
-  if (pt == NULL)
-    return;
   rebalance_tree(tree, *cr, pt);
 }
 
