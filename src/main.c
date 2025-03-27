@@ -33,13 +33,14 @@ double random_double(double min, double max) {
 int integer_cmp(void *v1, void *v2)
 {
   int i1 = *((int *)v1), i2 = *((int *)v2);
-  if (i1 < i2)
+  if (i1 < i2) {
     return -1;
+  }
   return i1 > i2;
 }
 void integer_cpy(void **v1, void *v2)
 {
-  *v1 = (void *)malloc(sizeof(int));
+  *v1 = (void *)calloc(1, sizeof(int));
   **((int **)v1) = *((int *)v2);
 }
 void integer_print(void *v1)
@@ -52,10 +53,10 @@ int main(void) {
   init_random();
   struct rb_tree *tree = rb_create_tree(integer_cmp, integer_cpy, NULL);
   int nums[10] = {90, 844, 1000, 884, 997, 310, 341, 183, 333, 694};
-  int data[7] = {0, 1, 2, 3, 4, 5, 6};
-  for (int i =0; i < 7; i++) {
-    int ri = random_int(0, 1000); 
-    rb_insert(tree, &data[i]);
+  //int data[7] = {0, 1, 2, 3, 4, 5, 6};
+  for (int i =0; i < 10; i++) {
+    //int ri = random_int(0, 1000); 
+    rb_insert(tree, &nums[i]);
   }
   if (tree->root == NULL)
     printf("insertion: failure!");

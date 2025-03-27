@@ -5,23 +5,23 @@
 
 #define RED_NODE(node, relative) ((node->colour == RED) && (relative->colour == RED))
 #define ROTATE_LEFT1(N, P, GP) do {\
-  N->parent = GP;\
-  P->parent = N;\
-  P->right = N->left;\
   if (N->left != NULL) {\
     (N->left)->parent = P;\
   }\
+  P->right = N->left;\
   N->left = P;\
   GP->left = N;\
+  N->parent = GP;\
+  P->parent = N;\
 } while (0)
 
 #define ROTATE_LEFT2(N, P, GP) do {\
   N->parent = GP;\
   P->parent = N;\
-  P->left = N->right;\
   if (N->right != NULL) {\
     (N->right)->parent = P;\
   }\
+  P->left = N->right;\
   N->right = P;\
   GP->right = N;\
 } while (0)
@@ -30,20 +30,20 @@
 #define ROTATE_RIGHT1(N, P, GP) do {\
   P->colour = BLACK;\
   GP->colour = RED;\
-  GP->left = P->right;\
   if (P->right != NULL) {\
     (P->right)->parent = GP;\
   }\
+  GP->left = P->right;\
   P->right = GP;\
 } while (0)
 
 #define ROTATE_RIGHT2(N, P, GP) do {\
   P->colour = BLACK;\
   GP->colour = RED;\
-  GP->right = P->left;\
   if (P->left != NULL) {\
     (P->left)->parent = GP;\
   }\
+  GP->right = P->left;\
   P->left = GP;\
 } while (0)
 
@@ -52,24 +52,15 @@
 static struct rb_node_t *get_lm_child(struct rb_node_t *node);
 static struct rb_node_t *get_sibling(struct rb_node_t *node);
 static _bool is_left_child(struct rb_node_t *pt, struct rb_node_t *chd);
-static int icmp(void *v1, void *v2);
-static void print(struct rb_tree *tree);
-static void rb_insert_at_subtree(struct rb_tree *tree, struct rb_node_t **root, void *val, _bool IS_NODE);
+static void rb_insert_at_subtree(struct rb_tree *tree, struct rb_node_t **root, void *val);
 
 //------------------------------------------------------------------------------------------
 
 static void rebalance_tree(struct rb_tree *tree, struct rb_node_t *node, struct rb_node_t *parent);
 
 //--------------------------- tree rotation functions. -------------------------------------
-static _bool rotate_left(struct rb_tree *tree, struct rb_node_t *node, struct rb_node_t *parent);
-static _bool rotate_right(struct rb_tree *tree, struct rb_node_t *node, struct rb_node_t *parent);
 //------------------------------------------------------------------------------------------
 
-//--------------------------- tree mutation cases. -----------------------------------------
-static void c1_rebalance(struct rb_tree *tree, struct rb_node_t *node);
-static void c2_rebalance(struct rb_tree *tree, struct rb_node_t *node);
-static void c3_rebalance(struct rb_tree *tree, struct rb_node_t *node);
-//------------------------------------------------------------------------------------------
 
 /**
  * allocates memory for node.
@@ -82,77 +73,81 @@ static struct rb_node_t *rb_create_node(struct rb_tree *tree, struct rb_node_t *
   node->right = NULL;
   node->colour = (tree->root == NULL) ? BLACK:RED;
   tree->valcpy(&(node->value), val);
+  if (tree->root == NULL) 
+    tree->root = node;
   return node;
 }
 
 static void rebalance_tree(struct rb_tree *tree, struct rb_node_t *node, struct rb_node_t *parent)
 {
-  struct rb_node_t *GP, *U, **N = &node, *P;
+  struct rb_node_t *GP, *U, *N = node, *P = parent;
   
   //LOOP where N is always a red node.
-  while (((*N) != NULL)) {
+  while (((N) != NULL)) {
     printf("in loop...\n");
-    if ((*N) == tree->root && (*N)->colour == RED) {
+    if ((N) == tree->root && (N)->colour == RED) {
       printf("red root.\n");
-      (*N)->colour = BLACK;
-      return;
+      (N)->colour = BLACK;
+      break;
     }
 
-    if ((P = (*N)->parent) == NULL) {
-      return;
+    if ((P = (N)->parent) == NULL) {
+      break;
     }
     
     if (P->colour == BLACK) {
-      return;
+      break;
     }
     else if (P == tree->root) {
       printf("parent root.\n");
       P->colour = BLACK;
-      return;
+      break;
     }
     GP = P->parent;
     if (GP == NULL) {
       printf("no gran.\n");
-      return;
+      break;
     }
 
     U = get_sibling(P);
     if (U != NULL && RED_NODE(P, U)) {
-      printf("no unc.\n");
       P->colour = BLACK;
       U->colour = BLACK;
       GP->colour = RED;
-      N = &GP;
-      printf("case 1.\n");
+      N = GP;
+      printf("recolouring.\n");
 
     }
     else {
-      int v1, v2, v3;
-      v1 = tree->cmp(*N, P);
-      v2 = tree->cmp(*N, GP);
-      v3 = tree->cmp(P, GP);
+      int v1 =0, v2=0, v3=0;
+      int val1 = *((int *)(N)->value), val2 = *((int *)(P)->value),val3 = *((int *)(GP)->value); 
+      v1 = tree->cmp(N->value, P->value);
+      v2 = tree->cmp(N->value, GP->value);
+      v3 = tree->cmp(P->value, GP->value);
 
-      printf("case 2\n");
+      printf("case 2 (%d > %d)=%d; (%d > %d)=%d; (%d > %d)=%d;\n",
+          val1, val2, v1, val1, val3, v2, val2, val3, v3);
       if (v1 > 0 && v2 < 0) {
         printf("left rotation 1.\n");
-        ROTATE_LEFT1((*N), P, GP);
+        ROTATE_LEFT1((N), P, GP);
         continue;
       } else if (v1 < 0 && v2 > 0) {
         printf("left rotation 2.\n");
-        ROTATE_LEFT2((*N), P, GP);
+        ROTATE_LEFT2((N), P, GP);
         continue;
       } else if (v1 < 0 && v3 < 0) {
         printf("right rotation 1:\n");
-        ROTATE_RIGHT1(*N, P, GP);
+        ROTATE_RIGHT1(N, P, GP);
         goto rr_gp;
 
       } else if ( v1 > 0 && v3 > 0) {
         printf("right rotation 2:\n");
-        ROTATE_RIGHT2(*N, P, GP);
+        ROTATE_RIGHT2(N, P, GP);
         goto rr_gp;
       }
 rr_gp:
       if (GP->parent != NULL) {
+        printf("right rotation COMPLETE >> Parent found\n");
         P->parent = GP->parent;
         if ((GP->parent)->left == GP)
           (GP->parent)->left = P;
@@ -162,7 +157,7 @@ rr_gp:
         GP->parent = P;
       }
       else {
-        printf("right rotation >> new root\n\n");
+        printf("right rotation COMPLETE >> new root\n");
         GP->parent = P;
         tree->root = P;
         P->parent = NULL;
@@ -170,29 +165,29 @@ rr_gp:
       break;
     }
   }  
-  printf("tree-rebalanced.\n");
+  printf("tree-rebalanced.\n\n");
 }
 
 
 void rb_insert(struct rb_tree *tree, void *val)
 {
-  rb_insert_at_subtree(tree, &(tree->root), val, 0);  
+  rb_insert_at_subtree(tree, &(tree->root), val);  
 }
 
 
-void rb_insert_at_subtree(struct rb_tree *tree, struct rb_node_t **root, void *val, _bool IS_NODE)
+void rb_insert_at_subtree(struct rb_tree *tree, struct rb_node_t **root, void *val)
 {
   struct rb_node_t **cr = root;
   struct rb_node_t *pt = NULL;
   int vl;
-  void *v = IS_NODE ? ((struct rb_node_t *)(val))->value : val;
+  //void *v = IS_NODE ? ((struct rb_node_t *)(val))->value : val;
 
-  printf("inserting %d\n",*((int *)val));
+  printf("INSERTING %d\n",*((int *)val));
   while (*cr != NULL) 
   {
-    vl = tree->cmp(v, (*cr)->value);
-    printf(" (%d:%d) --> ", (*cr)->colour ,*((int *)(*cr)->value));
+    vl = tree->cmp(val, (*cr)->value);
     pt = *cr; 
+    printf("(%d:%d)-->", pt->colour, *((int *)(pt)->value));
     if (vl < 0)
       cr = &((*cr)->left);
     else if (vl > 0)
@@ -200,7 +195,7 @@ void rb_insert_at_subtree(struct rb_tree *tree, struct rb_node_t **root, void *v
     else
       return;
   }
-  printf("done...\n");
+  printf("(%d:%d)\n",1, *((int *)val));
   *cr = rb_create_node(tree, pt, val);
   rebalance_tree(tree, *cr, pt);
 }
@@ -231,7 +226,6 @@ _bool has_next(struct rb_tree *tree)
 void next(struct rb_tree *tree)
 {
   struct rb_node_t *cr = (tree->current);
-  void *val = (cr)->value;
   _bool lft;
   if (cr == NULL)
     return;
@@ -240,12 +234,17 @@ void next(struct rb_tree *tree)
     return;
   }
   lft = is_left_child(cr->parent, cr);
-  if (lft)
-    tree->current = (cr)->parent; 
-  else if (cr->right != NULL)
+  if (cr->right == NULL) {
+    if (lft)
+      tree->current = (cr)->parent; 
+    else if (cr->right != NULL)
+      tree->current = get_lm_child(cr->right);
+    else 
+      tree->current = NULL;
+  }
+  else {
     tree->current = get_lm_child(cr->right);
-  else 
-    tree->current = NULL;
+  }
 }
 
 struct rb_tree *rb_create_tree(
@@ -314,7 +313,7 @@ static struct rb_node_t *get_lm_child(struct rb_node_t *node)
 }
 
 
-/* integer comparision */
+/* integer comparision 
 static int icmp(void *v1, void *v2)
 {
   int i1 = *((int*)(v1)), i2 = *((int *)(v2));
@@ -322,4 +321,4 @@ static int icmp(void *v1, void *v2)
     return -1;
   return i1 > i2;
 }
-
+*/
