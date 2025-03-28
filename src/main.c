@@ -30,7 +30,7 @@ double random_double(double min, double max) {
     return min + scale * (max - min);
 }
 
-int integer_cmp(void *v1, void *v2)
+int integer_cmp(const void *v1,const void *v2)
 {
   int i1 = *((int *)v1), i2 = *((int *)v2);
   if (i1 < i2) {
@@ -54,15 +54,27 @@ int main(void) {
   struct rb_tree *tree = rb_create_tree(integer_cmp, integer_cpy, NULL);
   int nums[10] = {90, 844, 1000, 884, 997, 310, 341, 183, 333, 694};
   //int data[7] = {0, 1, 2, 3, 4, 5, 6};
-  for (int i =0; i < 10; i++) {
-    //int ri = random_int(0, 1000); 
-    rb_insert(tree, &nums[i]);
+  int data[100];
+  for (int i =0; i < 100; i++) {
+    int ri = random_int(0, 1000);
+    data[i] = ri;
+    rb_insert(tree, &ri);
   }
+  
+
+  qsort(data, 100, sizeof(int), integer_cmp);
+
+  
   if (tree->root == NULL)
     printf("insertion: failure!");
   else
     printf("root: %d",*((int *)tree->root->value));
   printf("\n");
+  
+  for (int i =0; i < 100; i++) {
+    printf("%d -> ",data[i]);
+  }
+  printf("QSORT\n");
   rb_print_tree(tree, integer_print);
 }
 

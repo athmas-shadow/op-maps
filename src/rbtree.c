@@ -53,7 +53,7 @@ static struct rb_node_t *get_lm_child(struct rb_node_t *node);
 static struct rb_node_t *get_sibling(struct rb_node_t *node);
 static _bool is_left_child(struct rb_node_t *pt, struct rb_node_t *chd);
 static void rb_insert_at_subtree(struct rb_tree *tree, struct rb_node_t **root, void *val);
-
+static void rb_inorder_print(struct rb_node_t *node, void (*rb_print_node)(void *val));
 //------------------------------------------------------------------------------------------
 
 static void rebalance_tree(struct rb_tree *tree, struct rb_node_t *node, struct rb_node_t *parent);
@@ -248,11 +248,11 @@ void next(struct rb_tree *tree)
 }
 
 struct rb_tree *rb_create_tree(
-    int (*cmp)(void *n1, void *n2), 
+    int (*cmp)(const void *n1,const void *n2), 
     void (*valcpy)(void **v1, void *v2),
     int (*find)(void *val))
 {
-  struct rb_tree *tree = malloc(sizeof(struct rb_tree));
+  struct rb_tree *tree = (struct rb_tree *)malloc(sizeof(struct rb_tree));
   tree->root = NULL;
   tree->cmp = cmp;
   tree->find = find;
@@ -260,18 +260,20 @@ struct rb_tree *rb_create_tree(
   return tree;
 }
 
+
+void rb_inorder_print(struct rb_node_t *node, void (*rb_print_node)(void *val))
+{
+  if (node == NULL)
+    return;
+  rb_inorder_print(node->left, rb_print_node);
+  rb_print_node(node->value);
+  rb_inorder_print(node->right, rb_print_node);
+}
+
 void rb_print_tree(struct rb_tree *tree, void (*rb_print_node)(void *val))
 {
-  rb_init_iterator(tree);
-  if (tree->current == NULL)
-    printf("current not present: failure!");
-  else
-    printf("smallest: %d\n",*((int *)(tree->current)->value));
-  while (has_next(tree)) {
-    void *v = (tree->current)->value;
-    rb_print_node(v);
-    next(tree);
-  }
+
+  rb_inorder_print(tree->root, rb_print_node);
   printf("END\n");
 }
 

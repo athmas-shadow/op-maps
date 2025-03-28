@@ -17,7 +17,7 @@ struct rb_tree {
   //current node in iteration.
   struct rb_node_t *current;
   
-  int (*cmp)(void *n1, void *n2);
+  int (*cmp)(const void *n1, const void *n2);
   void (*valcpy)(void **v1, void *v2);
   int (*find)(void *val);
 
@@ -25,7 +25,7 @@ struct rb_tree {
 };
 
 extern struct rb_tree *rb_create_tree(
-    int (*cmp)(void *n1, void *n2),
+    int (*cmp)(const void *n1,const void *n2),
     void (*valcpy)(void **v1, void *v2),
     int (*find)(void *val)
     );
