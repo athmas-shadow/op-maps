@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdbool.h>
 #include "rbtree.h"
 
 #define RED_NODE(node, relative) ((node->colour == RED) && (relative->colour == RED))
@@ -47,25 +48,43 @@
   P->left = GP;\
 } while (0)
 
+struct node_loc {
+  struct rb_node_t **addrs;
+  struct rb_node_t *prnt;
+};
 
 //--------------------------- helper function definitions. ---------------------------------
 static struct rb_node_t *get_lm_child(struct rb_node_t *node);
 static struct rb_node_t *get_sibling(struct rb_node_t *node);
-static _bool is_left_child(struct rb_node_t *pt, struct rb_node_t *chd);
-static void rb_insert_at_subtree(struct rb_tree *tree, struct rb_node_t **root, void *val);
-static void rb_inorder_print(struct rb_node_t *node, void (*rb_print_node)(void *val));
-//------------------------------------------------------------------------------------------
+static bool is_left_child(struct rb_node_t *pt, struct rb_node_t *chd);
+static void rb_insert_at_subtree(struct rb_tree *tree, 
+    struct rb_node_t **root, void *val);
+static void rb_inorder_print(struct rb_node_t *node, 
+    void (*rb_print_node)(void *val));
+static bool rb_delete_node(struct rb_tree *tree, 
+    struct rb_node_t *parent, 
+    struct rb_node_t **current);
+static struct node_loc get_node_loc(struct rb_tree *tree, 
+    struct rb_node_t **root, 
+    void *val);
+static bool ch_are_blck(struct rb_node_t *node);
 
-static void rebalance_tree(struct rb_tree *tree, struct rb_node_t *node, struct rb_node_t *parent);
 
-//--------------------------- tree rotation functions. -------------------------------------
-//------------------------------------------------------------------------------------------
+//-------------------------- rebalancing functions. ----------------------------------------
+static void rebalance_insert(struct rb_tree *tree, 
+    struct rb_node_t *node, 
+    struct rb_node_t *parent);
+
+static void rebalance_delete(struct rb_tree *tree,
+    struct rb_node_t *node,
+    struct rb_node_t *parent);
 
 
 /**
  * allocates memory for node.
  * */
-static struct rb_node_t *rb_create_node(struct rb_tree *tree, struct rb_node_t *parent, void *val)
+static struct rb_node_t *rb_create_node(struct rb_tree *tree, 
+    struct rb_node_t *parent, void *val)
 {
   struct rb_node_t *node = (struct rb_node_t *)malloc(sizeof(struct rb_node_t));
   node->parent = parent;
@@ -78,23 +97,80 @@ static struct rb_node_t *rb_create_node(struct rb_tree *tree, struct rb_node_t *
   return node;
 }
 
-static void rebalance_tree(struct rb_tree *tree, struct rb_node_t *node, struct rb_node_t *parent)
+static bool rb_delete_node(struct rb_tree *tree, 
+    struct rb_node_t *parent,
+    struct rb_node_t **current)
 {
-  struct rb_node_t *GP, *U, *N = node, *P = parent;
-  
-  //LOOP where N is always a red node.
-  while (((N) != NULL)) {
-    printf("in loop...\n");
-    if ((N) == tree->root && (N)->colour == RED) {
-      printf("red root.\n");
-      (N)->colour = BLACK;
+  struct rb_node_t *node = *current;
+  bool is_root = tree->root == node;
+  if (node == NULL)
+    return false;
+  if (node->left == NULL && node->right == NULL) {
+    bool is_black = node->colour == BLACK;
+    free(node);
+    node = NULL;
+    return is_black;
+  } else if (node->left == NULL) {
+    *current = node->right;
+    (*current)->parent = node->parent;
+    (*current)->colour = BLACK;
+    free(node);
+  } else if (node->right == NULL) {
+    *current = node->left;
+    (*current)->parent = node->parent;
+    (*current)->colour = BLACK;
+    free(node);
+  } else {
+    node = get_lm_child(node->right);
+    (*current)->value = node->value;
+    free(node);
+  }
+  if (is_root) {
+    tree->root = *current;
+  }
+  return false;
+}
+
+static void rebalance_delete(struct rb_tree *tree, 
+    struct rb_node_t *node, 
+    struct rb_node_t *parent)
+{
+  struct rb_node_t *N = node, *S;
+  while (N != NULL) {
+    if (N == tree->root) {
       break;
+    }
+    S = get_sibling(N);
+    if (S == NULL)
+      return;
+    
+    if (S->colour == BLACK) {
+      if (ch_are_blck(S)) {
+        S->colour = RED;
+        N = N->parent;
+      }
     }
 
-    if ((P = (N)->parent) == NULL) {
+    
+  }
+}
+
+static void rebalance_insert(struct rb_tree *tree, 
+    struct rb_node_t *node, 
+    struct rb_node_t *parent)
+{
+  struct rb_node_t *GP, *U, *N = node, *P = parent;
+  //LOOP where N is always a red node.
+  while (N != NULL) {
+    printf("in loop...\n");
+    if (N == tree->root && N->colour == RED) {
+      printf("red root.\n");
+      N->colour = BLACK;
       break;
     }
-    
+    if ((P = N->parent) == NULL) {
+      break;
+    }
     if (P->colour == BLACK) {
       break;
     }
@@ -108,7 +184,6 @@ static void rebalance_tree(struct rb_tree *tree, struct rb_node_t *node, struct 
       printf("no gran.\n");
       break;
     }
-
     U = get_sibling(P);
     if (U != NULL && RED_NODE(P, U)) {
       P->colour = BLACK;
@@ -116,7 +191,6 @@ static void rebalance_tree(struct rb_tree *tree, struct rb_node_t *node, struct 
       GP->colour = RED;
       N = GP;
       printf("recolouring.\n");
-
     }
     else {
       int v1 =0, v2=0, v3=0;
@@ -153,7 +227,6 @@ rr_gp:
           (GP->parent)->left = P;
         else 
           (GP->parent)->right = P;
-        
         GP->parent = P;
       }
       else {
@@ -169,35 +242,70 @@ rr_gp:
 }
 
 
+
+struct node_loc get_node_loc(struct rb_tree *tree, struct rb_node_t **root, void *val)
+{
+  struct rb_node_t **cr = root;
+  struct rb_node_t *pt  = NULL;
+  struct node_loc oploc = { .addrs=NULL, .prnt=NULL };
+  int v1;
+
+  printf("INSERTING %d\n",*((int *)val));
+  while (*cr != NULL) {
+    v1 = tree->cmp(val, (*cr)->value);
+    pt = *cr;
+    printf("(%d:%d)-->", pt->colour, *((int *)(pt)->value));
+    if (v1 < 0)
+      cr = &((*cr)->left);
+    else if (v1 > 0)
+      cr = &((*cr)->right);
+    else 
+      return oploc;
+  }
+  printf("(%d:%d)\n",1, *((int *)val));
+  oploc.addrs = cr;
+  oploc.prnt = pt;
+  return oploc;
+}
+
+void rb_delete(struct rb_tree *tree, void *val)
+{
+
+}
+
+void rb_delete_at_subtree(struct rb_tree *tree, struct rb_node_t **root, void *val)
+{
+  struct rb_node_t **cr, *pt;
+  struct node_loc op_loc = get_node_loc(tree, root, val);
+  bool n_rb;
+  cr = op_loc.addrs;
+  pt = op_loc.prnt;
+  if (cr == NULL) {
+    return;
+  }
+  n_rb = rb_delete_node(tree, pt, cr);
+  if (n_rb) {
+    rebalance_delete(tree, pt, pt->parent);
+  }
+}
+
 void rb_insert(struct rb_tree *tree, void *val)
 {
   rb_insert_at_subtree(tree, &(tree->root), val);  
 }
 
-
 void rb_insert_at_subtree(struct rb_tree *tree, struct rb_node_t **root, void *val)
 {
-  struct rb_node_t **cr = root;
-  struct rb_node_t *pt = NULL;
+  struct rb_node_t **cr, *pt;
+  struct node_loc op_loc = get_node_loc(tree, root, val);
+  cr = op_loc.addrs;
+  pt = op_loc.prnt;
   int vl;
-  //void *v = IS_NODE ? ((struct rb_node_t *)(val))->value : val;
-
-  printf("INSERTING %d\n",*((int *)val));
-  while (*cr != NULL) 
-  {
-    vl = tree->cmp(val, (*cr)->value);
-    pt = *cr; 
-    printf("(%d:%d)-->", pt->colour, *((int *)(pt)->value));
-    if (vl < 0)
-      cr = &((*cr)->left);
-    else if (vl > 0)
-      cr = &((*cr)->right);
-    else
-      return;
+  if (cr == NULL) {
+    return;
   }
-  printf("(%d:%d)\n",1, *((int *)val));
   *cr = rb_create_node(tree, pt, val);
-  rebalance_tree(tree, *cr, pt);
+  rebalance_insert(tree, *cr, pt);
 }
 
 void rb_init_iterator(struct rb_tree *tree)
@@ -283,11 +391,38 @@ void rb_print_node_int(struct rb_node_t *node)
 }
 
 /*------------------------------------ helper functions. -------------------------*/
-static _bool is_left_child(struct rb_node_t * pt, struct rb_node_t *chd)
+
+static bool ch_are_blck(struct rb_node_t *node)
 {
-  return pt->left == chd;
+  if (node == NULL) {
+    return false;
+  }
+  if (node->left == NULL && node->right == NULL) {
+    return false;
+  }
+  else if (node->left == NULL)  {
+    struct rb_node_t *r = node->right;
+    return r->colour == BLACK;
+  }
+  else if (node->right == NULL) {
+    struct rb_node_t *l = node->left;
+    return l->colour == BLACK;
+  }
+  else {
+    struct rb_node_t *l, *r;
+    l = node->left;
+    r = node->right;
+    bool lc = l->colour == BLACK;
+    bool rc = r->colour == BLACK;
+    return lc && rc;
+  }
 }
 
+static bool is_left_child(struct rb_node_t * pt, struct rb_node_t *chd)
+{
+  struct rb_node_t *lft = pt->left;
+  return lft == chd;
+}
 
 static struct rb_node_t *get_sibling(struct rb_node_t *node)
 {
@@ -313,14 +448,3 @@ static struct rb_node_t *get_lm_child(struct rb_node_t *node)
   }
   return pt;
 }
-
-
-/* integer comparision 
-static int icmp(void *v1, void *v2)
-{
-  int i1 = *((int*)(v1)), i2 = *((int *)(v2));
-  if (i1 < i2)
-    return -1;
-  return i1 > i2;
-}
-*/
